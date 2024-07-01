@@ -5,7 +5,10 @@ This project aims to help label research papers to fit arXiv's extensive labelli
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-evaluation-template.streamlit.app/)
 
 ### How to run it on your own machine
-
+Before running it on your machine, you will need to install the necessary libraries using:
+```
+pip install streamlit pandas scikit-learn transformers imbalanced-learn nltk torch
+```
 1. Install the requirements
 
    ```
