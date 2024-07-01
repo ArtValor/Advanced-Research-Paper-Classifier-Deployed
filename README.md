@@ -1,7 +1,6 @@
-# 📊 Data evaluation template
+# Advanced Research Paper Classifier
 
-A simple Streamlit app showing how to evaluate and annotate data, using dataframes
-and charts. 
+This project aims to help label research papers to fit arXiv's extensive labelling system. We used SciBERT to create a robust classification pipeline that uses the abstracts of research papers to sort them into 50+ labels. This leverages the now popular transformers mechanism to help the model understand the abstracts, and then use this information to accurately classify the papers.
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-evaluation-template.streamlit.app/)
 
@@ -12,7 +11,6 @@ and charts.
    ```
    $ pip install -r requirements.txt
    ```
-
 2. Run the app
 
    ```
