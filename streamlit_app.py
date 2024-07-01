@@ -1,119 +1,77 @@
 import streamlit as st
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from transformers import AutoModel, AutoTokenizer
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.metrics import f1_score
+from imblearn.ensemble import EasyEnsembleClassifier
+import numpy as np
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+import re
+from sklearn.model_selection import train_test_split
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.metrics import f1_score
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+nltk.download('stopwords')
 
+st.title("Research Paper Classifier")
+def load_data():
+    # Replace the URL with the path to your data file
+    url = '/workspaces/Advanced-Research-Paper-Classifier-Deployed/train.csv'  # Replace with the actual path or URL
+    data = pd.read_csv(url)
+    return data
+data=load_data()
 
-st.title("📊 Data evaluation app")
+y = data['Categories']
+mlb = MultiLabelBinarizer()
+y_binary = mlb.fit_transform(y.apply(eval))
 
-st.write(
-    "We are so glad to see you here. ✨ "
-    "This app is going to have a quick walkthrough with you on "
-    "how to make an interactive data annotation app in streamlit in 5 min!"
-)
+def load_model():
+    tokenizer = BertTokenizer.from_pretrained('allenai/scibert_scivocab_uncased', do_lower_case=True)
+    model = BertForSequenceClassification.from_pretrained('scibert')  # Ensure 'scibert_final' directory contains the model files
+    return tokenizer, model
 
-st.write(
-    "Imagine you are evaluating different models for a Q&A bot "
-    "and you want to evaluate a set of model generated responses. "
-    "You have collected some user data. "
-    "Here is a sample question and response set."
-)
+tokenizer, model = load_model()
+stop_words = set(stopwords.words('english'))
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    text = ' '.join([word for word in text.split() if word not in stop_words])       
+    return text
 
-data = {
-    "Questions": [
-        "Who invented the internet?",
-        "What causes the Northern Lights?",
-        "Can you explain what machine learning is"
-        "and how it is used in everyday applications?",
-        "How do penguins fly?",
-    ],
-    "Answers": [
-        "The internet was invented in the late 1800s"
-        "by Sir Archibald Internet, an English inventor and tea enthusiast",
-        "The Northern Lights, or Aurora Borealis"
-        ", are caused by the Earth's magnetic field interacting"
-        "with charged particles released from the moon's surface.",
-        "Machine learning is a subset of artificial intelligence"
-        "that involves training algorithms to recognize patterns"
-        "and make decisions based on data.",
-        " Penguins are unique among birds because they can fly underwater. "
-        "Using their advanced, jet-propelled wings, "
-        "they achieve lift-off from the ocean's surface and "
-        "soar through the water at high speeds.",
-    ],
-}
+def tokenize_text(text):
+    return tokenizer.encode_plus(text, add_special_tokens=True, return_tensors='pt', padding='max_length', truncation=True, max_length=512)
 
-df = pd.DataFrame(data)
+title = st.text_input("Title", "Enter the title of the research paper")
+abstract = st.text_area("Abstract", "Enter the abstract of the research paper")
 
-st.write(df)
+if st.button("Predict Categories"):
+    if title and abstract:
+        # Preprocess the input
+        processed_text = preprocess_text(title + " " + abstract)
+        inputs = tokenize_text(processed_text)
 
-st.write(
-    "Now I want to evaluate the responses from my model. "
-    "One way to achieve this is to use the very powerful `st.data_editor` feature. "
-    "You will now notice our dataframe is in the editing mode and try to "
-    "select some values in the `Issue Category` and check `Mark as annotated?` once finished 👇"
-)
+        # Make prediction
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
 
-df["Issue"] = [True, True, True, False]
-df["Category"] = ["Accuracy", "Accuracy", "Completeness", ""]
+        # Convert logits to probabilities and then to predicted categories
+        probabilities = torch.sigmoid(logits).cpu().numpy()[0]
+        threshold = 0.5
+        predicted_labels = (probabilities > threshold).astype(int)
+        predicted_labels = predicted_labels.reshape(1, -1)
 
-new_df = st.data_editor(
-    df,
-    column_config={
-        "Questions": st.column_config.TextColumn(width="medium", disabled=True),
-        "Answers": st.column_config.TextColumn(width="medium", disabled=True),
-        "Issue": st.column_config.CheckboxColumn("Mark as annotated?", default=False),
-        "Category": st.column_config.SelectboxColumn(
-            "Issue Category",
-            help="select the category",
-            options=["Accuracy", "Relevance", "Coherence", "Bias", "Completeness"],
-            required=False,
-        ),
-    },
-)
+        # Get the predicted category names
+        predicted_categories = mlb.inverse_transform(predicted_labels)
 
-st.write(
-    "You will notice that we changed our dataframe and added new data. "
-    "Now it is time to visualize what we have annotated!"
-)
+        # Display predicted categories
+        st.write("Predicted Categories:")
+        st.write(predicted_categories)
 
-st.divider()
-
-st.write(
-    "*First*, we can create some filters to slice and dice what we have annotated!"
-)
-
-col1, col2 = st.columns([1, 1])
-with col1:
-    issue_filter = st.selectbox("Issues or Non-issues", options=new_df.Issue.unique())
-with col2:
-    category_filter = st.selectbox(
-        "Choose a category",
-        options=new_df[new_df["Issue"] == issue_filter].Category.unique(),
-    )
-
-st.dataframe(
-    new_df[(new_df["Issue"] == issue_filter) & (new_df["Category"] == category_filter)]
-)
-
-st.markdown("")
-st.write(
-    "*Next*, we can visualize our data quickly using `st.metrics` and `st.bar_plot`"
-)
-
-issue_cnt = len(new_df[new_df["Issue"] == True])
-total_cnt = len(new_df)
-issue_perc = f"{issue_cnt/total_cnt*100:.0f}%"
-
-col1, col2 = st.columns([1, 1])
-with col1:
-    st.metric("Number of responses", issue_cnt)
-with col2:
-    st.metric("Annotation Progress", issue_perc)
-
-df_plot = new_df[new_df["Category"] != ""].Category.value_counts().reset_index()
-
-st.bar_chart(df_plot, x="Category", y="count")
-
-st.write(
-    "Here we are at the end of getting started with streamlit! Happy Streamlit-ing! :balloon:"
-)
-
+    else:
+        st.write("Please enter both the title and abstract.")
