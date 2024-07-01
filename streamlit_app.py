@@ -21,7 +21,7 @@ nltk.download('stopwords')
 st.title("Research Paper Classifier")
 def load_data():
     # Replace the URL with the path to your data file
-    url = '/workspaces/Advanced-Research-Paper-Classifier-Deployed/train.csv'  # Replace with the actual path or URL
+    url = 'train.csv'  # Replace with the actual path or URL
     data = pd.read_csv(url)
     return data
 data=load_data()
